@@ -7,8 +7,9 @@ Bone IDs reference: https://www.unknowncheats.me/wiki/Apex_Legends_Bones_and_Hit
 
 Game version (Steam & origin): v3.0.1.29
 
-- Working on Windows 10 20H1 (only)
-- Work in BoderLess and FullScreen
+- That's made to work on QEMU/KVM, so we dont talk about Linux Host, Windows VM and passthrough configuration
+- Tested on Last release of Ubuntu and ProxMox
+- Working on Windows 10 20H1 (never below)
 
 - 1920*1080 (need to be changed manually - search 2560 and/or 1440 in apex_dam.cpp)
 - 2560*1440 (default)
@@ -32,7 +33,8 @@ VISUALS :
  - Spectators count + Name List (Name List temporary disable but you can active it)
 
 FEATURES :
- - DirectX 12
+ - Work in BoderLess and FullScreen
+ - work with DirectX 12
  - Added a visual DOT to know if you're connected on the server (GREEN DOT) or disconnected (RED DOT)
  - Added the BruteForce and optimization CR3/DTB fix by MisterY
  - Press F1 (To Activate GloW, ESP Seer Health/Shield and Aimbot based on default conf)
