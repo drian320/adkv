@@ -14,12 +14,16 @@ FEATURES :
  - 2560*1440 by default (you can change in code manually - search 2560 and 1440 to replace with your numbers in apex_dma.cpp)
  - Red dot in Overlay when Client is connected to Server
  - Optimization of DTB shuffle
- - Added Dynamic Fov/Smooth/Aim from low meters (80m)
+ - Added Dynamic Fov/Smooth/Aim from low meters (70m)
  - Added Player XP/Level
  - Added Spectators viewers + List (Need to unquote some part of code harcored to get it work - will update it to let the user choose dirrectly from the menu or keybind)
  - Added updater.py to easy update offsets.h with new offsets.ini (can be found on https://www.unknowncheats.me/forum/apex-legends/319804-apex-legends-reversal-structs-offsets-888.html) with this command : py updater.py offsets.h offsets.ini
  - Everything can be change in Menu (INSERT)
- - F1 for Player Glow & Aim (after starting wxhen In-Game)
+ - Aim_Key (Left mouse by default) & Aim_key2 (Right mouse) activated from 70m
+ - F1 for Player Glow & Aim (after starting when In-Game)
+ - F5 ESP
+ - F6 AIM
+ - F7 Player Glow (Only)
  - F9 for 1v1
  - F10 for Training (Dummies)
 
