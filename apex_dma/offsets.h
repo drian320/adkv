@@ -1,4 +1,4 @@
-#define GameVersion v3.0.2.31 //[Miscellaneous].GameVersion updated 2025/01/08
+#define GameVersion v3.0.1.29 //[Miscellaneous].GameVersion updated 2025/01/08
 #define OFFSET_ENTITYLIST 0x6b6ce88 //[Miscellaneous].cl_entitylist updated 2025/04/18
 #define OFFSET_LOCAL_ENT 0x26c8128 //[Miscellaneous].LocalPlayer updated 2025/03/25
 #define OFFSET_LOCAL_ENTITY_HANDLE 0x1ae6c0c //[Miscellaneous].LocalEntityHandle updated 2025/04/18
