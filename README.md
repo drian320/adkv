@@ -7,7 +7,7 @@ Bone IDs reference: https://www.unknowncheats.me/wiki/Apex_Legends_Bones_and_Hit
 
 Game version (Steam & Origin): v3.0.1.29
 
-[b]You need to obfuscate Client.exe and Overlay.exe to be not detected.[/b]
+You need to obfuscate Client.exe and Overlay.exe to be not detected.
 
 FEATURES :
  - Work in Borderless and FullScreen
