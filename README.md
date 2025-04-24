@@ -1,41 +1,72 @@
-# apex_dma_kvm 2.0
- Apex Legends QEMU/KVM hack
+# apex_dma_kvm_pub 3.0
+ Apex Legends QEMU/KVM hack memflow
 
 UnknownCheats thread: https://www.unknowncheats.me/forum/apex-legends/406426-kvm-vmread-apex-esp-aimbot.html
 
 Bone IDs reference: https://www.unknowncheats.me/wiki/Apex_Legends_Bones_and_Hitboxes
 
-Game version (Steam & Origin): v3.0.1.29
+Game version (Steam & origin): v3.0.2.31 
 
-You need to obfuscate Client.exe and Overlay.exe to be not detected.
+Updated to work with Apex DX 12
 
-FEATURES :
- - Work in Borderless and FullScreen
- - 2560*1440 by default (you can change in code manually - search 2560 and 1440 to replace with your numbers in apex_dma.cpp)
- - Red dot in Overlay when Client is connected to Server
- - Optimization of DTB shuffle
- - Added Dynamic Fov/Smooth/Aim from low meters (70m)
- - Added Player XP/Level
- - Added Spectators viewers + List (Need to unquote some part of code harcored to get it work - will update it to let the user choose dirrectly from the menu or keybind)
- - Added updater.py to easy update offsets.h with new offsets.ini (can be found on https://www.unknowncheats.me/forum/apex-legends/319804-apex-legends-reversal-structs-offsets-888.html) with this command : py updater.py offsets.h offsets.ini
- - Everything can be change in Menu (INSERT)
- - Aim_Key (Left mouse by default) & Aim_key2 (Right mouse) activated from 70m
- - F1 for Player Glow & Aim (after starting when In-Game)
- - F5 ESP
- - F6 AIM
- - F7 Player Glow (Only)
- - F9 for 1v1
- - F10 for Training (Dummies)
+if you still stuck at : 
+- Init with qemu connector...
+- Can't create qemu connector
+- Init with kvm connector...
+- Can't create kvm connector
 
-INSTALL : 
+I added a script install_memflow.sh to install memflow-kvm & memflow-qemu at https://github.com/albatror/memflow so
 - Download sources from there *.zip or git
 - Extract it
-- Install Cargo & Rust with the famous curl https://sh.rustup.rs/ -sSf | sh
-- Install memflow with the famous curl --proto '=https' --tlsv1.2 -sSf https://sh.memflow.io/ | sh
-- check https://github.com/memflow/memflow-kvm and/or https://github.com/memflow/memflowup (better) to install memflow-kvm connector.
-- Compile with the build.sh to see if any errors.
-- When build is ok without errors, start Overlay (obfuscated) then Client (obfuscated)
-- On the Linux console (host) start the server by : sudo ./apex_dma
+- Install Cargo & Rust with the famous curl https://sh.rustup.rs -sSf | sh
+- Install memflow with the famous curl --proto '=https' --tlsv1.2 -sSf https://sh.memflow.io | sh
+- Compile with the build.sh to see if any errors, if errors, fix it/them then redo build.
+- When build is ok without errors, Download from https://github.com/albatror/memflow/blob/main/install_memflow.sh
+- Make the script executable, Edit it, Read and Save.
+- Run it. You will see if its OK in the console :) then you will see in /apex_dma/memflow_lib/ 2 new folders :
+    * memflow-kvm
+    * memflow-qemu
+- Go back to rebuild the complete sources.
+    
+(DONT FORGET TO UPDATE WITH YOUR PATH IF NEEDED IN THE SCRIPT AT # Export PATH & # Define variables)
 
+- Working on Windows 10 20H1 (only)
 
-IN UPDATE - NOT FINISHED
+- 1920/1080 (need to be changed manually)
+- 2560/1440 (default)
+
+VISUALS :
+ - ESP Box, XP Level, Line, Name, Distance
+ - ESP Seer Health and Shield
+ - Circle FOV
+ - Players Glow (GREEN when visible, RED when not visible and YELLOW when knocked - Can be changed in the menu of the overlay)
+ - Items Glow (complete disable)
+ - Spectators count + Name List (Name List temporary disable but you can active it)
+
+FEATURES :
+ - Added a visual DOT to know if you're connected on the server (GREEN DOT) or disconnected (RED DOT)
+ - Added the BruteForce CR3/DTB fix by MisterY
+ - New function to read localPlayer with OFFSET_LOCAL_ENTITY_HANDLE //[Miscellaneous].LocalEntityHandle (seem more easy for new updates)
+ - Press F1 (To Activate GloW, ESP Seer Health/Shield and Aimbot based on default conf)
+ - Dynamic FOV/AIM/SMOOTH [70m by default] Process Updated & Optimized 04/12/2024 - Settings added in overlay
+ - AutoSuperGlide (nothing to do, it do for you :) ) !Someone tell me to check that, i will.
+ - AutoWallJump updated (Slide then jump on a wall, dont touch anything else and it'll auto-walljump)
+ - 1V1 (F9)
+ - Training with dummies (F10)
+
+!!! WARNING !!!
+
+ - If using Client.exe and Overlay.exe - obfuscate both files to avoid detection.
+ - If using Client.exe and Overlay from NVIDIA - obfuscate both files to avoid detection.
+
+ - You need to manually change the path on the client side at apex_guest/Client/Client/main.cpp - Change USERS to yours.
+ -> #include "C:\Users\YOUR_USER\WHERE_YOU_KNOW\apex_guest\Client\Client\imgui\imgui.h"
+
+<img src="https://github.com/albatror/adkv/blob/master/demo/settingsS.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/settingsS2.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/Demo2.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/settingsN2.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/Demo4.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/ingame1.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/ingame2.png" style="display: block; margin: auto;" />
+<img src="https://github.com/albatror/adkv/blob/master/demo/connected.png" style="display: block; margin: auto;" />
