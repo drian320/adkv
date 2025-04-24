@@ -5,36 +5,24 @@ UnknownCheats thread: https://www.unknowncheats.me/forum/apex-legends/406426-kvm
 
 Bone IDs reference: https://www.unknowncheats.me/wiki/Apex_Legends_Bones_and_Hitboxes
 
-Game version (Steam & origin): v3.0.2.31 
-
-Updated to work with Apex DX 12
-
-if you still stuck at : 
-- Init with qemu connector...
-- Can't create qemu connector
-- Init with kvm connector...
-- Can't create kvm connector
-
-I added a script install_memflow.sh to install memflow-kvm & memflow-qemu at https://github.com/albatror/memflow so
-- Download sources from there *.zip or git
-- Extract it
-- Install Cargo & Rust with the famous curl https://sh.rustup.rs -sSf | sh
-- Install memflow with the famous curl --proto '=https' --tlsv1.2 -sSf https://sh.memflow.io | sh
-- Compile with the build.sh to see if any errors, if errors, fix it/them then redo build.
-- When build is ok without errors, Download from https://github.com/albatror/memflow/blob/main/install_memflow.sh
-- Make the script executable, Edit it, Read and Save.
-- Run it. You will see if its OK in the console :) then you will see in /apex_dma/memflow_lib/ 2 new folders :
-    * memflow-kvm
-    * memflow-qemu
-- Go back to rebuild the complete sources.
-    
-(DONT FORGET TO UPDATE WITH YOUR PATH IF NEEDED IN THE SCRIPT AT # Export PATH & # Define variables)
+Game version (Steam & origin): v3.0.1.29
 
 - Working on Windows 10 20H1 (only)
+- Work in BoderLess and FullScreen
 
-- 1920/1080 (need to be changed manually)
-- 2560/1440 (default)
+- 1920*1080 (need to be changed manually - search 2560 and/or 1440 in apex_dam.cpp)
+- 2560*1440 (default)
 
+INSTALL : 
+ - Download sources from there *.zip or git
+ - Extract it
+ - Install Cargo & Rust with the famous curl https://sh.rustup.rs/ -sSf | sh (dont forget to add your USER)
+ - Install memflow with the famous curl --proto '=https' --tlsv1.2 -sSf https://sh.memflow.io/ | sh (dont forget to add your USER)
+ - check https://github.com/memflow/memflow-kvm and/or https://github.com/memflow/memflowup (better) to install memflow-kvm connector.
+ - Compile with the build.sh to see if any errors.
+ - When build is ok without errors, start Overlay (obfuscated) then Client (obfuscated)
+ - On the Linux console (host) start the server by : sudo ./apex_dma
+    
 VISUALS :
  - ESP Box, XP Level, Line, Name, Distance
  - ESP Seer Health and Shield
@@ -44,9 +32,9 @@ VISUALS :
  - Spectators count + Name List (Name List temporary disable but you can active it)
 
 FEATURES :
+ - DirectX 12
  - Added a visual DOT to know if you're connected on the server (GREEN DOT) or disconnected (RED DOT)
- - Added the BruteForce CR3/DTB fix by MisterY
- - New function to read localPlayer with OFFSET_LOCAL_ENTITY_HANDLE //[Miscellaneous].LocalEntityHandle (seem more easy for new updates)
+ - Added the BruteForce and optimization CR3/DTB fix by MisterY
  - Press F1 (To Activate GloW, ESP Seer Health/Shield and Aimbot based on default conf)
  - Dynamic FOV/AIM/SMOOTH [70m by default] Process Updated & Optimized 04/12/2024 - Settings added in overlay
  - AutoSuperGlide (nothing to do, it do for you :) ) !Someone tell me to check that, i will.
