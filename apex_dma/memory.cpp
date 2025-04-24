@@ -80,7 +80,7 @@ void Memory::check_proc()
 
 bool kernel_init(Inventory *inv, const char *connector_name)
 {
-	if (inventory_create_connector(inv, connector_name, "", conn.get()))
+	if (mf_inventory_create_connector(inv, connector_name, "", conn.get()))
 	{
 		printf("Can't create %s connector\n", connector_name);
 		return false;
@@ -91,10 +91,10 @@ bool kernel_init(Inventory *inv, const char *connector_name)
 	}
 
 	kernel = std::make_unique<OsInstance<>>();
-	if (inventory_create_os(inv, "win32", "", conn.get(), kernel.get()))
+	if (mf_inventory_create_os(inv, "win32", "", conn.get(), kernel.get()))
 	{
 		printf("Unable to initialize kernel using %s connector\n", connector_name);
-		connector_drop(conn.get());
+		mf_connector_drop(conn.get());
 		kernel.reset();
 		return false;
 	}
@@ -175,16 +175,16 @@ void Memory::open_proc(const char *name)
 	if (!conn)
 	{
 		conn = std::make_unique<ConnectorInstance<>>();
-		Inventory *inv = inventory_scan();
+		Inventory *inv = mf_inventory_scan();
 
+		printf("Init with kvm connector...\n");
+		if (!kernel_init(inv, "kvm"))
+		{
 		printf("Init with qemu connector...\n");
 		if (!kernel_init(inv, "qemu"))
-		{
-			printf("Init with kvm connector...\n");
-			if (!kernel_init(inv, "kvm"))
 			{
 				printf("Quitting\n");
-				inventory_free(inv);
+				mf_inventory_free(inv);
 				exit(1);
 			}
 		}
@@ -192,11 +192,11 @@ void Memory::open_proc(const char *name)
 		printf("Kernel initialized: %p\n", kernel.get()->container.instance.instance);
 	}
 
+
 	if (lastCorrectDtbPhysicalAddress && bruteforceDtb(0x0, 0x100000))
 	{
 		return;
 	}
-
 	close_proc();
 
 	ProcessInfo info;
@@ -205,8 +205,11 @@ void Memory::open_proc(const char *name)
 	if (kernel.get()->process_info_by_name(name, &info))
 	{
 		status = process_status::NOT_FOUND;
+		//lastCorrectDtbPhysicalAddress = 0;
 		return;
 	}
+	//
+	//close_proc();
 
 	if (kernel.get()->clone().into_process_by_info(info, &proc.hProcess))
 	{
