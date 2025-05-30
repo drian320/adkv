@@ -50,9 +50,6 @@ FEATURES :
  - If using Client.exe and Overlay.exe - obfuscate both files to avoid detection.
  - If using Client.exe and Overlay from NVIDIA - obfuscate both files to avoid detection.
 
- - You need to manually change the path on the client side at apex_guest/Client/Client/main.cpp - Change USERS to yours.
- -> #include "C:\Users\YOUR_USER\WHERE_YOU_KNOW\apex_guest\Client\Client\imgui\imgui.h"
-
 <img src="https://github.com/albatror/adkv/blob/master/demo/settingsS.png" style="display: block; margin: auto;" />
 <img src="https://github.com/albatror/adkv/blob/master/demo/settingsS2.png" style="display: block; margin: auto;" />
 <img src="https://github.com/albatror/adkv/blob/master/demo/Demo2.png" style="display: block; margin: auto;" />
