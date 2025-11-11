@@ -1,0 +1,22 @@
+[
+  {
+    "directory": "/home/user/project/rust/adkv/apex_dma",
+    "command": "g++ -c -o build/obj/apex_dma.o apex_dma.cpp -I./memflow_lib/memflow-ffi/ -L./memflow_lib/target/release -Wno-multichar",
+    "file": "apex_dma.cpp"
+  },
+  {
+    "directory": "/home/user/project/rust/adkv/apex_dma",
+    "command": "g++ -c -o build/obj/Game.o Game.cpp -I./memflow_lib/memflow-ffi/ -L./memflow_lib/target/release -Wno-multichar",
+    "file": "Game.cpp"
+  },
+  {
+    "directory": "/home/user/project/rust/adkv/apex_dma",
+    "command": "g++ -c -o build/obj/Math.o Math.cpp -I./memflow_lib/memflow-ffi/ -L./memflow_lib/target/release -Wno-multichar",
+    "file": "Math.cpp"
+  },
+  {
+    "directory": "/home/user/project/rust/adkv/apex_dma",
+    "command": "g++ -c -o build/obj/memory.o memory.cpp -I./memflow_lib/memflow-ffi/ -L./memflow_lib/target/release -Wno-multichar",
+    "file": "memory.cpp"
+  }
+]

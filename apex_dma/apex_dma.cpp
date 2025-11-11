@@ -10,11 +10,22 @@
 #include <thread>
 #include <array>
 #include <fstream>
+#include "shared_memory.h"
 ////////////////////////
 ////////////////////////
 
+// Client機能の有効/無効を切り替え (0=無効, 1=有効)
+#ifndef CLIENT_ENABLED
+#define CLIENT_ENABLED 0
+#endif
+
 Memory apex_mem;
+#if CLIENT_ENABLED
 Memory client_mem;
+#endif
+
+// 共有メモリライター (Linux GUIクライアント用)
+SharedMemoryWriter shm_writer;
 
 bool firing_range = false;
 bool active = true;
@@ -92,7 +103,11 @@ bool aim_t = false;
 bool vars_t = false;
 //bool item_t = false;
 uint64_t g_Base;
+#if CLIENT_ENABLED
 uint64_t c_Base;
+#else
+uint64_t c_Base = 1; // Client無効時はダミー値
+#endif
 bool next = false;
 bool valid = false;
 bool lock = false;
@@ -665,6 +680,7 @@ player players[toRead];
 static void EspLoop()
 {
 	esp_t = true;
+	printf("[DEBUG] EspLoop started\n");
 	while (esp_t)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -673,6 +689,10 @@ static void EspLoop()
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 			if (esp)
 			{
+				static int debug_counter = 0;
+				if (debug_counter++ % 1000 == 0) {
+					printf("[DEBUG] EspLoop: Running (ESP enabled, counter=%d)\n", debug_counter);
+				}
 				valid = false;
 
 			uint64_t LocalPlayer = 0;
@@ -817,6 +837,13 @@ Entity LPlayer = getEntity(LocalPlayer);
 				}	
 				else
 				{
+					int valid_player_count = 0;
+					int checked_entities = 0;
+					int player_entities = 0;
+					int alive_entities = 0;
+					int team_filtered = 0;
+					int dist_filtered = 0;
+
 					for (int i = 0; i < toRead; i++)
 					{
 						uint64_t centity = 0;
@@ -825,29 +852,33 @@ Entity LPlayer = getEntity(LocalPlayer);
 						{
 							continue;
 						}
-						
+						checked_entities++;
+
 						if (LocalPlayer == centity)
 						{
 							continue;
 						}
 
 						Entity Target = getEntity(centity);
-						
+
 						if (!Target.isPlayer())
 						{
 							continue;
 						}
+						player_entities++;
 
 						if (!Target.isAlive())
 						{
 							continue;
 						}
+						alive_entities++;
 
 						int entity_team = Target.getTeamId();
 						if (!onevone)
 						{
 							if (entity_team < 0 || entity_team > 50 || entity_team == team_player)
 							{
+								team_filtered++;
 								continue;
 							}
 						}
@@ -855,13 +886,15 @@ Entity LPlayer = getEntity(LocalPlayer);
 						{
 							if (entity_team < 0 || entity_team>50)
 							{
+								team_filtered++;
                               continue;
                             }						}
 
 						Vector EntityPosition = Target.getPosition();
 						float dist = LocalPlayerPosition.DistTo(EntityPosition);
 						if (dist > max_dist || dist < 50.0f)
-						{	
+						{
+							dist_filtered++;
 							continue;
 						}
 
@@ -879,7 +912,7 @@ Entity LPlayer = getEntity(LocalPlayer);
 							int shield = Target.getShield();
 							int maxshield = Target.getMaxShield();
 							int armortype = Target.getArmortype();
-							players[i] = 
+							players[i] =
 							{
 								dist,
 								entity_team,
@@ -900,7 +933,19 @@ Entity LPlayer = getEntity(LocalPlayer);
 							Target.get_name(g_Base, i - 1, &players[i].name[0]);
 							lastvis_esp[i] = Target.lastVisTime();
 							valid = true;
+							valid_player_count++;
 						}
+					}
+
+					// 詳細なデバッグ情報を定期的に出力
+					static int loop_counter = 0;
+					if (loop_counter++ % 100 == 0 || valid_player_count > 0) {
+						printf("[DEBUG] EspLoop stats: checked=%d, players=%d, alive=%d, team_filtered=%d, dist_filtered=%d, valid=%d\n",
+							checked_entities, player_entities, alive_entities, team_filtered, dist_filtered, valid_player_count);
+					}
+
+					if (valid_player_count > 0) {
+						printf("[DEBUG] EspLoop: Found %d valid players\n", valid_player_count);
 					}
 				}
 
@@ -959,6 +1004,7 @@ Entity LPlayer = getEntity(LocalPlayer);
 	aim_t = false;
 }
 
+#if CLIENT_ENABLED
 static void set_vars(uint64_t add_addr)
 {
 	printf("Reading client vars...\n");
@@ -1244,6 +1290,7 @@ while (vars_t)
 }
 vars_t = false;
 }
+#endif // CLIENT_ENABLED
 
 // Item Glow Stuff
 
@@ -1254,6 +1301,18 @@ int main(int argc, char *argv[])
 	{
 		printf("Error: %s is not running as root\n", argv[0]);
 		return 0;
+	}
+
+	// 共有メモリ初期化
+	if (!shm_writer.init()) {
+		printf("Warning: Failed to initialize shared memory. GUI client will not work.\n");
+	} else {
+		printf("Shared memory initialized successfully.\n");
+		printf("[DEBUG] Sizeof Settings: %zu bytes\n", sizeof(Settings));
+		printf("[DEBUG] Sizeof Player: %zu bytes\n", sizeof(Player));
+		printf("[DEBUG] Sizeof Spectator: %zu bytes\n", sizeof(Spectator));
+		printf("[DEBUG] Sizeof SharedData: %zu bytes\n", sizeof(SharedData));
+		printf("[DEBUG] Settings offset in SharedData: %zu\n", offsetof(SharedData, settings));
 	}
 
 	const char* cl_proc = "Client.exe";
@@ -1267,7 +1326,9 @@ int main(int argc, char *argv[])
 	std::thread actions_thr;
 	//std::thread itemglow_thr;
 
+#if CLIENT_ENABLED
 	std::thread vars_thr;
+#endif
 	bool proc_not_found = false;
 	while (active)
 	{
@@ -1323,6 +1384,7 @@ int main(int argc, char *argv[])
 			apex_mem.check_proc();
 		}
 
+#if CLIENT_ENABLED
 		if (client_mem.get_proc_status() != process_status::FOUND_READY)
 		{
 			if (vars_t)
@@ -1332,7 +1394,7 @@ int main(int argc, char *argv[])
 
 				vars_thr.~thread();
 			}
-			
+
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 			printf("Searching for client process...\n");
 
@@ -1351,6 +1413,72 @@ int main(int argc, char *argv[])
 		else
 		{
 			client_mem.check_proc();
+		}
+#endif // CLIENT_ENABLED
+
+		// 共有メモリ経由で設定を読み取り (Linux GUIクライアント)
+		shm_writer.read_settings(
+			aim, esp, player_glow, aim_no_recoil,
+			max_dist, smooth, max_fov, bone,
+			glowr, glowg, glowb,
+			glowrviz, glowgviz, glowbviz,
+			glowrknocked, glowgknocked, glowbknocked,
+			firing_range, shooting, onevone
+		);
+
+		// 定期的に設定値をログ出力
+		static int settings_log_counter = 0;
+		if (settings_log_counter++ % 1000 == 0) {
+			printf("[DEBUG] Settings: aim=%d, esp=%d, player_glow=%d, max_dist=%.1f, firing_range=%d\n",
+				aim, esp, player_glow, max_dist, firing_range);
+		}
+
+		// 共有メモリへゲームデータを書き込み
+		shm_writer.update_game_base(g_Base);
+		shm_writer.update_spectators(spectators, allied_spectators);
+
+		// Playerデータを共有メモリに書き込み (重要: これがないとGUIに敵情報が表示されない)
+		if (valid) {
+			// player構造体からPlayer構造体に変換
+			Player shared_players[100];
+			memset(shared_players, 0, sizeof(shared_players));
+
+			size_t valid_count = 0;
+			for (int i = 0; i < toRead; i++) {
+				if (players[i].dist > 0) {
+					shared_players[valid_count].head_x = players[i].h_y;
+					shared_players[valid_count].head_y = players[i].h_y;
+					shared_players[valid_count].origin_x = players[i].b_x;
+					shared_players[valid_count].origin_y = players[i].b_y;
+					shared_players[valid_count].health = players[i].health;
+					shared_players[valid_count].shield = players[i].shield;
+					shared_players[valid_count].team_num = players[i].entity_team;
+					shared_players[valid_count].distance = players[i].dist;
+					shared_players[valid_count].is_visible = players[i].visible;
+					shared_players[valid_count].is_knocked = players[i].knocked;
+					valid_count++;
+				}
+			}
+
+			if (valid_count > 0) {
+				shm_writer.update_players(shared_players, valid_count);
+				printf("[DEBUG] Main: Writing %zu players to shared memory\n", valid_count);
+			}
+		}
+
+		// Spectatorリストを共有メモリに書き込み
+		Spectator shared_spectators[100];
+		memset(shared_spectators, 0, sizeof(shared_spectators));
+
+		size_t spec_count = 0;
+		for (int i = 0; i < toRead; i++) {
+			if (spectator_list[i].is_spec && strlen(spectator_list[i].name) > 0) {
+				strncpy(shared_spectators[spec_count].name, spectator_list[i].name, 64);
+				spec_count++;
+			}
+		}
+		if (spec_count > 0) {
+			shm_writer.update_spectators_list(shared_spectators, spec_count);
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));

@@ -1,4 +1,13 @@
 #include "memory.h"
+
+// Forward declare inventory functions without mf_ prefix (actual exports from library)
+extern "C" {
+	Inventory *inventory_scan();
+	int32_t inventory_create_connector(Inventory *inv, const char *name, const char *args, ConnectorInstance<> *out);
+	int32_t inventory_create_os(Inventory *inv, const char *name, const char *args, ConnectorInstance<> *conn, OsInstance<> *out);
+	void inventory_free(Inventory *inv);
+	void connector_drop(ConnectorInstance<> *conn);
+}
 #include <unistd.h>
 
 // Credits: learn_more, stevemk14ebr
@@ -80,7 +89,7 @@ void Memory::check_proc()
 
 bool kernel_init(Inventory *inv, const char *connector_name)
 {
-	if (mf_inventory_create_connector(inv, connector_name, "", conn.get()))
+	if (inventory_create_connector(inv, connector_name, "", conn.get()))
 	{
 		printf("Can't create %s connector\n", connector_name);
 		return false;
@@ -91,10 +100,10 @@ bool kernel_init(Inventory *inv, const char *connector_name)
 	}
 
 	kernel = std::make_unique<OsInstance<>>();
-	if (mf_inventory_create_os(inv, "win32", "", conn.get(), kernel.get()))
+	if (inventory_create_os(inv, "win32", "", conn.get(), kernel.get()))
 	{
 		printf("Unable to initialize kernel using %s connector\n", connector_name);
-		mf_connector_drop(conn.get());
+		connector_drop(conn.get());
 		kernel.reset();
 		return false;
 	}
@@ -175,7 +184,7 @@ void Memory::open_proc(const char *name)
 	if (!conn)
 	{
 		conn = std::make_unique<ConnectorInstance<>>();
-		Inventory *inv = mf_inventory_scan();
+		Inventory *inv = inventory_scan();
 
 		printf("Init with kvm connector...\n");
 		if (!kernel_init(inv, "kvm"))
@@ -184,7 +193,7 @@ void Memory::open_proc(const char *name)
 		if (!kernel_init(inv, "qemu"))
 			{
 				printf("Quitting\n");
-				mf_inventory_free(inv);
+				inventory_free(inv);
 				exit(1);
 			}
 		}
