@@ -1,4 +1,5 @@
 #include <array>
+#include <vector>
 #include "prediction.h"
 #include <cassert>
 #include <ostream>
@@ -554,6 +555,64 @@ Entity getEntity(uintptr_t ptr)
 	//entity.player_level();
     }
     return entity;}
+
+bool getEntityBatch(const std::vector<uint64_t> &ptrs, std::vector<Entity> &entities)
+{
+	entities.clear();
+	if (ptrs.empty())
+	{
+		return true;
+	}
+
+	entities.resize(ptrs.size());
+
+	thread_local std::vector<MemoryBatchRead> batch_requests;
+	batch_requests.clear();
+	batch_requests.reserve(ptrs.size());
+
+	for (size_t i = 0; i < ptrs.size(); ++i)
+	{
+		Entity &entity = entities[i];
+		uint64_t ptr = ptrs[i];
+		entity.ptr = ptr;
+		entity.is_player = false;
+		entity.player_xp_level = 0;
+
+		if (!ptr)
+		{
+			continue;
+		}
+
+		batch_requests.emplace_back(MemoryBatchRead{ptr, entity.buffer, sizeof(entity.buffer)});
+	}
+
+	if (batch_requests.empty())
+	{
+		return true;
+	}
+
+	if (apex_mem.ReadBatch(batch_requests))
+	{
+		return true;
+	}
+
+	bool success = true;
+	for (size_t i = 0; i < ptrs.size(); ++i)
+	{
+		uint64_t ptr = ptrs[i];
+		if (!ptr)
+		{
+			continue;
+		}
+
+		if (!apex_mem.ReadArray<uint8_t>(ptr, entities[i].buffer, sizeof(entities[i].buffer)))
+		{
+			success = false;
+		}
+	}
+
+	return success;
+}
 
 //Item getItem(uintptr_t ptr)
 //{

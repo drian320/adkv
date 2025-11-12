@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <mutex>
 #include <memory>
+#include <vector>
 
 #define INRANGE(x, a, b) (x >= a && x <= b)
 #define getBits(x) (INRANGE(x, '0', '9') ? (x - '0') : ((x & (~0x20)) - 'A' + 0xa))
@@ -56,6 +57,13 @@ enum class process_status : BYTE
 	FOUND_READY
 };
 
+struct MemoryBatchRead
+{
+	uint64_t address;
+	void *buffer;
+	size_t size;
+};
+
 class Memory
 {
 private:
@@ -88,6 +96,8 @@ public:
 
 	template <typename T>
 	bool WriteArray(uint64_t address, const T value[], size_t len);
+
+	bool ReadBatch(const std::vector<MemoryBatchRead> &requests);
 
 	uint64_t ScanPointer(uint64_t ptr_address, const uint32_t offsets[], int level);
 

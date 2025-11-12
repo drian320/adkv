@@ -1,6 +1,7 @@
 #include "Math.h"
 #include "offsets.h"
 #include "memory.h"
+#include <vector>
 
 #define NUM_ENT_ENTRIES			(1 << 12)
 #define ENT_ENTRY_MASK			(NUM_ENT_ENTRIES - 1)
@@ -154,6 +155,7 @@ struct InState
 ///////////////////////////////////
 
 Entity getEntity(uintptr_t ptr);
+bool getEntityBatch(const std::vector<uint64_t> &ptrs, std::vector<Entity> &entities);
 //Item getItem(uintptr_t ptr);
 bool WorldToScreen(Vector from, float* m_vMatrix, int targetWidth, int targetHeight, Vector& to);
 float CalculateFov(Entity& from, Entity& target);

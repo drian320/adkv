@@ -6,9 +6,11 @@
 #include <chrono>
 #include <iostream>
 #include <cfloat>
+#include <atomic>
 #include "Game.h"
 #include <thread>
 #include <array>
+#include <vector>
 #include <fstream>
 #include "shared_memory.h"
 ////////////////////////
@@ -26,6 +28,82 @@ Memory client_mem;
 
 // 共有メモリライター (Linux GUIクライアント用)
 SharedMemoryWriter shm_writer;
+
+static bool ReadEntityPointers(uint64_t entitylist, uint64_t *output, size_t count)
+{
+	if (count == 0)
+	{
+		return true;
+	}
+
+	thread_local std::vector<MemoryBatchRead> requests;
+	requests.clear();
+	requests.reserve(count);
+
+	for (size_t i = 0; i < count; ++i)
+	{
+		requests.emplace_back(MemoryBatchRead{entitylist + ((uint64_t)i << 5), &output[i], sizeof(uint64_t)});
+	}
+
+	if (apex_mem.ReadBatch(requests))
+	{
+		return true;
+	}
+
+	bool success = true;
+	for (size_t i = 0; i < count; ++i)
+	{
+		uint64_t value = 0;
+		const bool read_ok = apex_mem.Read<uint64_t>(entitylist + ((uint64_t)i << 5), value);
+		output[i] = value;
+		success = success && read_ok;
+	}
+	return success;
+}
+
+struct EntityFetchRequest
+{
+	int index;
+	uint64_t address;
+};
+
+constexpr int64_t LOCAL_PLAYER_CACHE_TTL_NS = 2'000'000; // 2ms
+
+static bool ReadLocalPlayerCached(uint64_t &local_player)
+{
+	static std::atomic<uint64_t> cached_value{0};
+	static std::atomic<int64_t> cached_timestamp_ns{0};
+
+	if (g_Base == 0)
+	{
+		local_player = 0;
+		cached_value.store(0, std::memory_order_relaxed);
+		cached_timestamp_ns.store(0, std::memory_order_relaxed);
+		return false;
+	}
+
+	const auto now = std::chrono::steady_clock::now();
+	const int64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+	const int64_t last_ns = cached_timestamp_ns.load(std::memory_order_relaxed);
+
+	if (last_ns != 0 && (now_ns - last_ns) < LOCAL_PLAYER_CACHE_TTL_NS)
+	{
+		local_player = cached_value.load(std::memory_order_relaxed);
+		return true;
+	}
+
+	uint64_t value = 0;
+	if (!apex_mem.Read<uint64_t>(g_Base + OFFSET_LOCAL_ENT, value))
+	{
+		return false;
+	}
+
+	cached_value.store(value, std::memory_order_relaxed);
+	cached_timestamp_ns.store(now_ns, std::memory_order_relaxed);
+	local_player = value;
+	return true;
+}
+
 
 bool firing_range = false;
 bool active = true;
@@ -371,14 +449,11 @@ void DoActions()
 			std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
 			uint64_t LocalPlayer = 0;
-			apex_mem.Read<uint64_t>(g_Base + OFFSET_LOCAL_ENT, LocalPlayer);
-
-// Ensure the local player entity is valid
-			if (LocalPlayer == 0)
+			if (!ReadLocalPlayerCached(LocalPlayer) || LocalPlayer == 0)
 				continue;
 
-// Retrieve the local player entity object
-Entity LPlayer = getEntity(LocalPlayer);
+			// Retrieve the local player entity object
+			Entity LPlayer = getEntity(LocalPlayer);
 
 			team_player = LPlayer.getTeamId();
 			if (team_player < 0 || team_player > 50 && !onevone)
@@ -567,17 +642,37 @@ if (isGrappling && grappleAttached == 1) {
 
 			if (firing_range)
 			{
-				int c = 0;
+				thread_local std::vector<uint64_t> firing_range_entities;
+				firing_range_entities.resize(10000);
+				ReadEntityPointers(entitylist, firing_range_entities.data(), firing_range_entities.size());
+
+				std::vector<EntityFetchRequest> fetch_list;
+				fetch_list.reserve(firing_range_entities.size());
+
 				for (int i = 0; i < 10000; i++)
 				{
-					uint64_t centity = 0;
-					apex_mem.Read<uint64_t>(entitylist + ((uint64_t)i << 5), centity);
-					if (centity == 0)
+					uint64_t centity = firing_range_entities[i];
+					if (!centity || LocalPlayer == centity)
+					{
 						continue;
-					if (LocalPlayer == centity)
-						continue;
+					}
+					fetch_list.push_back({i, centity});
+				}
 
-					Entity Target = getEntity(centity);
+				std::vector<uint64_t> fetch_addresses;
+				fetch_addresses.reserve(fetch_list.size());
+				for (const auto &request : fetch_list)
+				{
+					fetch_addresses.push_back(request.address);
+				}
+
+				std::vector<Entity> batched_entities;
+				getEntityBatch(fetch_addresses, batched_entities);
+
+				int c = 0;
+				for (size_t idx = 0; idx < batched_entities.size(); ++idx)
+				{
+					Entity &Target = batched_entities[idx];
 					if (!Target.isDummy())
 					{
 						continue;
@@ -598,39 +693,64 @@ if (isGrappling && grappleAttached == 1) {
 			}
 			else
 			{
+				std::array<uint64_t, toRead> entity_handles{};
+				ReadEntityPointers(entitylist, entity_handles.data(), entity_handles.size());
+
+				std::vector<EntityFetchRequest> fetch_list;
+				fetch_list.reserve(entity_handles.size());
 				for (int i = 0; i < toRead; i++)
 				{
-					uint64_t centity = 0;
-					apex_mem.Read<uint64_t>(entitylist + ((uint64_t)i << 5), centity);
-					if (centity == 0)
-						continue;
-					if (LocalPlayer == centity)
-						continue;
-					Entity Target = getEntity(centity);
-					if (!Target.isPlayer())
+					uint64_t centity = entity_handles[i];
+					if (!centity || LocalPlayer == centity)
 					{
 						continue;
 					}
-					
+					fetch_list.push_back({i, centity});
+				}
+
+				std::vector<uint64_t> fetch_addresses;
+				fetch_addresses.reserve(fetch_list.size());
+				for (const auto &request : fetch_list)
+				{
+					fetch_addresses.push_back(request.address);
+				}
+
+				std::vector<Entity> batched_entities;
+				getEntityBatch(fetch_addresses, batched_entities);
+
+				const float localyaw = LPlayer.GetYaw();
+
+				for (size_t idx = 0; idx < batched_entities.size(); ++idx)
+				{
+					const auto &request = fetch_list[idx];
+					const int entity_index = request.index;
+					Entity &Target = batched_entities[idx];
+
+					if (!Target.isPlayer())
+					{
+						spectator_list[entity_index].is_spec = false;
+						strcpy(spectator_list[entity_index].name, "");
+						continue;
+					}
+
 //////////////////
-					float localyaw = LPlayer.GetYaw();
 					float targetyaw = Target.GetYaw();
 					if (!Target.isAlive() && localyaw == targetyaw) { // If this player is a spectator
-					char temp_name[34];  // Assuming MAX_NAME_LENGTH + 1 for null terminator
-					Target.get_name(g_Base, i - 1, &temp_name[0]);
+					char temp_name[34] = {0};  // Assuming MAX_NAME_LENGTH + 1 for null terminator
+					Target.get_name(g_Base, entity_index - 1, &temp_name[0]);
 					
 					//Target.get_name(data_buf.name);					
 
     					if (temp_name[0]) { // Check if the player has a name (i.e., hasn't quit)
-        				strcpy(spectator_list[i].name, temp_name);
-        				spectator_list[i].is_spec = true;
+        				strcpy(spectator_list[entity_index].name, temp_name);
+        				spectator_list[entity_index].is_spec = true;
     					} else {
-        				spectator_list[i].is_spec = false; // Player has quit
-        				strcpy(spectator_list[i].name, ""); // Clear the name
+        				spectator_list[entity_index].is_spec = false; // Player has quit
+        				strcpy(spectator_list[entity_index].name, ""); // Clear the name
     					}
 					} else {
-    					spectator_list[i].is_spec = false;
-    					strcpy(spectator_list[i].name, ""); // Clear the name if not a spectator
+    					spectator_list[entity_index].is_spec = false;
+    					strcpy(spectator_list[entity_index].name, ""); // Clear the name if not a spectator
 					}
 
 					// Print spectator list
@@ -640,7 +760,7 @@ if (isGrappling && grappleAttached == 1) {
 					//}
 //////////////////
 
-					ProcessPlayer(LPlayer, Target, entitylist, i);
+					ProcessPlayer(LPlayer, Target, entitylist, entity_index);
 
 					int entity_team = Target.getTeamId();
 					if (entity_team == team_player && !onevone)
@@ -696,30 +816,18 @@ static void EspLoop()
 				valid = false;
 
 			uint64_t LocalPlayer = 0;
-			apex_mem.Read<uint64_t>(g_Base + OFFSET_LOCAL_ENT, LocalPlayer);
-				if (LocalPlayer == 0)
-{
-    next = true;
-    while(next && g_Base != 0 && c_Base != 0 && esp)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-    continue;
-}
+			if (!ReadLocalPlayerCached(LocalPlayer) || LocalPlayer == 0)
+			{
+				next = true;
+				while (next && g_Base != 0 && c_Base != 0 && esp)
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(1));
+				}
+				continue;
+			}
 
-// Ensure the local player entity is valid
-if (LocalPlayer == 0)
-{
-    next = true;
-    while(next && g_Base != 0 && c_Base != 0 && esp)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-    continue;
-}
-
-// Retrieve the local player entity object
-Entity LPlayer = getEntity(LocalPlayer);
+			// Retrieve the local player entity object
+			Entity LPlayer = getEntity(LocalPlayer);
 
 				int team_player = LPlayer.getTeamId();
 				if (team_player < 0 || team_player > 50)
@@ -743,24 +851,39 @@ Entity LPlayer = getEntity(LocalPlayer);
 				uint64_t entitylist = g_Base + OFFSET_ENTITYLIST;
 				
 				memset(players, 0, sizeof(players));
+				thread_local std::vector<EntityFetchRequest> entity_fetch_list;
+				thread_local std::vector<uint64_t> entity_fetch_addresses;
+				thread_local std::vector<Entity> batched_entities;
+				entity_fetch_list.clear();
+				entity_fetch_addresses.clear();
+				batched_entities.clear();
 				if (firing_range)
 				{
-					int c = 0;
+					thread_local std::vector<uint64_t> firing_range_entities;
+					firing_range_entities.resize(10000);
+					ReadEntityPointers(entitylist, firing_range_entities.data(), firing_range_entities.size());
+
 					for (int i = 0; i < 10000; i++)
 					{
-						uint64_t centity = 0;
-						apex_mem.Read<uint64_t>(entitylist + ((uint64_t)i << 5), centity);
-						if (centity == 0)
+						uint64_t centity = firing_range_entities[i];
+						if (!centity || LocalPlayer == centity)
 						{
 							continue;
 						}
+						entity_fetch_list.push_back({i, centity});
+						entity_fetch_addresses.push_back(centity);
+					}
 
-						if (LocalPlayer == centity)
-						{
-							continue;
-						}
+					if (!entity_fetch_addresses.empty())
+					{
+						getEntityBatch(entity_fetch_addresses, batched_entities);
+					}
 
-						Entity Target = getEntity(centity);
+					int c = 0;
+					for (size_t idx = 0; idx < batched_entities.size(); ++idx)
+					{
+						const auto &request = entity_fetch_list[idx];
+						Entity &Target = batched_entities[idx];
 
 						if (!Target.isDummy())
 						{
@@ -828,7 +951,7 @@ Entity LPlayer = getEntity(LocalPlayer);
 								armortype,
 								//Target.read_xp_level()
 							};
-							Target.get_name(g_Base, i - 1, &players[c].name[0]);
+							Target.get_name(g_Base, request.index - 1, &players[c].name[0]);
 							lastvis_esp[c] = Target.lastVisTime();
 							valid = true;
 							c++;
@@ -837,6 +960,9 @@ Entity LPlayer = getEntity(LocalPlayer);
 				}	
 				else
 				{
+					std::array<uint64_t, toRead> entity_handles{};
+					ReadEntityPointers(entitylist, entity_handles.data(), entity_handles.size());
+
 					int valid_player_count = 0;
 					int checked_entities = 0;
 					int player_entities = 0;
@@ -846,8 +972,7 @@ Entity LPlayer = getEntity(LocalPlayer);
 
 					for (int i = 0; i < toRead; i++)
 					{
-						uint64_t centity = 0;
-						apex_mem.Read<uint64_t>(entitylist + ((uint64_t)i << 5), centity);
+						uint64_t centity = entity_handles[i];
 						if (centity == 0)
 						{
 							continue;
@@ -859,7 +984,20 @@ Entity LPlayer = getEntity(LocalPlayer);
 							continue;
 						}
 
-						Entity Target = getEntity(centity);
+						entity_fetch_list.push_back({i, centity});
+						entity_fetch_addresses.push_back(centity);
+					}
+
+					if (!entity_fetch_addresses.empty())
+					{
+						getEntityBatch(entity_fetch_addresses, batched_entities);
+					}
+
+					for (size_t idx = 0; idx < batched_entities.size(); ++idx)
+					{
+						const auto &request = entity_fetch_list[idx];
+						const int i = request.index;
+						Entity &Target = batched_entities[idx];
 
 						if (!Target.isPlayer())
 						{
@@ -981,14 +1119,11 @@ static void AimbotLoop()
 				lastaimentity = aimentity;
 
 				uint64_t LocalPlayer = 0;
-				apex_mem.Read<uint64_t>(g_Base + OFFSET_LOCAL_ENT, LocalPlayer);
-
-// Ensure the local player entity is valid
-				if (LocalPlayer == 0)
+				if (!ReadLocalPlayerCached(LocalPlayer) || LocalPlayer == 0)
 					continue;
 
-// Retrieve the local player entity object
-Entity LPlayer = getEntity(LocalPlayer);
+				// Retrieve the local player entity object
+				Entity LPlayer = getEntity(LocalPlayer);
 				QAngle Angles = CalculateBestBoneAim(LPlayer, aimentity, max_fov);
 				if (Angles.x == 0 && Angles.y == 0)
 				{

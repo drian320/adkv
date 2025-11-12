@@ -277,3 +277,32 @@ uint64_t Memory::ScanPointer(uint64_t ptr_address, const uint32_t offsets[], int
 
 	return lvl;
 }
+
+bool Memory::ReadBatch(const std::vector<MemoryBatchRead> &requests)
+{
+	if (requests.empty())
+		return true;
+
+	std::lock_guard<std::mutex> l(m);
+	if (!proc.baseaddr)
+		return false;
+
+	std::vector<ReadData> operations;
+	operations.reserve(requests.size());
+
+	for (const auto &req : requests)
+	{
+		if (!req.buffer || !req.size || !req.address)
+			continue;
+
+		ReadData entry;
+		entry._0 = req.address;
+		entry._1 = CSliceMut<uint8_t>(reinterpret_cast<char *>(req.buffer), req.size);
+		operations.emplace_back(entry);
+	}
+
+	if (operations.empty())
+		return false;
+
+	return proc.hProcess.read_raw_list(CSliceMut<ReadData>(operations)) == 0;
+}
